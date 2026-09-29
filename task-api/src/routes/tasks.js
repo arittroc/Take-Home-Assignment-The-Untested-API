@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const taskService = require('../services/taskService');
-const { validateCreateTask, validateUpdateTask } = require('../utils/validators');
+const { validateCreateTask, validateUpdateTask, validateAssignee } = require('../utils/validators');
 
 router.get('/stats', (req, res) => {
   const stats = taskService.getStats();
@@ -58,6 +58,27 @@ router.delete('/:id', (req, res) => {
   }
 
   res.status(204).send();
+});
+
+// NEW: PATCH /tasks/:id/assign
+// Body: { "assignee": "name" } to assign, or { "assignee": null } to unassign.
+// Design decisions:
+// - Reassignment is idempotent and allowed (returns the task, not an error) —
+//   realistic and convenient; constraints can be layered later without breaking
+//   existing clients.
+// - 404 check happens in the service, consistent with the other id-based routes.
+router.patch('/:id/assign', (req, res) => {
+  const error = validateAssignee(req.body.assignee);
+  if (error) {
+    return res.status(400).json({ error });
+  }
+
+  const task = taskService.assignTask(req.params.id, req.body.assignee);
+  if (!task) {
+    return res.status(404).json({ error: 'Task not found' });
+  }
+
+  res.json(task);
 });
 
 router.patch('/:id/complete', (req, res) => {
